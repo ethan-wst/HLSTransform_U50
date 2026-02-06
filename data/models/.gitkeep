@@ -1,0 +1,4 @@
+# This file preserves the data/models directory structure
+# Place model files here:
+# - weights.bin (model weights)
+# - tokenizer.bin (tokenizer vocabulary)

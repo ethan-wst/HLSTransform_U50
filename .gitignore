@@ -1,0 +1,64 @@
+# Build outputs
+build/
+*.log
+*.jou
+
+# IDE files
+_ide/
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+
+# Don't ignore results (selective commit)
+# results/
+
+# Vitis/Vivado
+.Xil/
+.ipcache/
+_x/
+*.xclbin.info
+*.xclbin.link_summary
+*.xclbin.run_summary
+*.protoinst
+*.wcfg
+*.wdb
+
+# HLS outputs (use build/ directory)
+vitis_hls.log
+*.directive
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+venv/
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Backup files
+*.bak
+*.backup
+
+# Large data files (use Git LFS or external storage)
+data/models/*.bin
+data/test_datasets/*.txt
+!data/models/.gitkeep
+!data/test_datasets/.gitkeep
+
+# XRT runtime
+*.xclbin.link_summary
+*.xclbin.info
+emconfig.json

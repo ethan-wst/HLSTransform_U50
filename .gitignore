@@ -62,3 +62,10 @@ data/test_datasets/*.txt
 *.xclbin.link_summary
 *.xclbin.info
 emconfig.json
+
+docs/*
+
+# Platform files
+*.xsa
+*.xpfm
+*.spfm

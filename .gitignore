@@ -1,7 +1,10 @@
 # Build outputs
-build/
+build/*
 *.log
 *.jou
+
+# Archival storage
+archives/*
 
 # IDE files
 _ide/

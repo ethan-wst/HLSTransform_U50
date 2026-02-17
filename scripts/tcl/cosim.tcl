@@ -1,6 +1,5 @@
-# C/RTL Co-Simulation - cycle-accurate verification
-# Run from: build/hls/ (requires prior synthesis)
+# C/RTL Co-Simulation
 open_project forward
-open_solution "solution1"
+open_solution "Llama2_Inference"
 cosim_design
 exit

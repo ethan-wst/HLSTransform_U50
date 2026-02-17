@@ -1,12 +1,13 @@
 #!/bin/bash
 # v++ link: Place & Route .xo -> .xclbin
-# Args: $1=kernel.xo $2=output.xclbin $3=platform $4=link.cfg
+
 set -e
 
 XO="$1"
 XCLBIN="$2"
 PLATFORM="$3"
 LINK_CFG="$4"
+LINK_DIR="$5"
 
 [ -f "$XO" ]       || { echo "Error: $XO not found"; exit 1; }
 [ -f "$PLATFORM" ] || { echo "Error: Platform $PLATFORM not found"; exit 1; }
@@ -15,26 +16,31 @@ LINK_CFG="$4"
 # If platform is .xpfm, it references hw/hw.xsa in the same directory - must exist
 if [[ "$PLATFORM" == *.xpfm ]]; then
     PLATFORM_DIR=$(dirname "$PLATFORM")
-    if [[ ! -f "$PLATFORM_DIR/hw/hw.xsa" ]]; then
-        echo "Error: Platform is incomplete. $PLATFORM references hw/hw.xsa but it is missing."
-        echo "  Expected: $PLATFORM_DIR/hw/hw.xsa"
-        echo ""
-        echo "Download the full Alveo U50 platform (Development Target Platform) from:"
-        echo "  https://www.amd.com/en/support/downloads/alveo-downloads.html"
-        echo "Then extract it so that platform/hw/hw.xsa exists next to the .xpfm file."
+    [ -f "$PLATFORM_DIR/hw/hw.xsa" ] || {
+        echo "Error: Platform incomplete. Missing $PLATFORM_DIR/hw/hw.xsa"
         exit 1
-    fi
+    }
 fi
 
-echo "Linking $XO -> $XCLBIN"
-echo "WARNING: This takes 2-6 hours"
+WORK_DIR="${LINK_DIR}/work"
+REPORTS_DIR="${LINK_DIR}/reports"
+LOGS_DIR="${LINK_DIR}/logs"
+
+mkdir -p "${WORK_DIR}" "${REPORTS_DIR}" "${LOGS_DIR}"
+
+# Run v++ from work directory to contain outputs
+cd "${WORK_DIR}"
 
 v++ --platform "$PLATFORM" \
     --target hw \
     --config "$LINK_CFG" \
     --optimize 3 \
     --save-temps \
+    --temp_dir "${WORK_DIR}/temp" \
+    --log_dir "${LOGS_DIR}" \
+    --report_dir "${REPORTS_DIR}" \
     --link "$XO" \
     -o "$XCLBIN"
 
-echo "XCLBIN generated: $XCLBIN"
+# Copy final output to expected location
+[ -f "$XCLBIN" ] && cp "$XCLBIN" "${LINK_DIR}/"

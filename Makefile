@@ -29,7 +29,7 @@ LINK_CFG      := $(PROJECT_ROOT)/configs/link.cfg
 VITIS_HLS     ?= vitis_hls
 VPP           ?= v++
 
-.PHONY: all help setup csim syn cosim link host run build archive \
+.PHONY: all help setup csim syn cosim link host run build archive eval\
         clean clean_csim clean_cosim clean_syn check_env
 
 all: help
@@ -119,6 +119,14 @@ run: host
 		-z $(DATA_DIR)/models/tokenizer.bin \
 		-k $(KERNEL_XCLBIN) \
 		-m generate -n 256
+
+eval: host
+	@test -f $(KERNEL_XCLBIN)              || { echo "ERROR: Run 'make link' first";  exit 1; }
+	@test -f $(DATA_DIR)/models/weights.bin || { echo "ERROR: weights.bin not found"; exit 1; }
+	$(HOST_EXE) $(DATA_DIR)/models/weights.bin \
+		-z $(DATA_DIR)/models/tokenizer.bin \
+		-k $(KERNEL_XCLBIN) \
+		-m evaluate -e $(DATA_DIR)/test_datasets/TinyStoriesV2-GPT4-valid.txt
 
 # Archive
 archive:

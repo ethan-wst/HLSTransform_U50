@@ -12,7 +12,6 @@
 #include <algorithm>
 #include <vector>
 #include "../kernels/typedefs.h"
-#include "../kernels/forward.h"
 #include "../kernels/config.h"
 
 #include <xrt/xrt_bo.h>
@@ -840,12 +839,23 @@ void generate(Weights *weights, Tokenizer *tokenizer, Sampler *sampler, char *pr
                 num_prompt_tokens, safe_capacity);
         num_prompt_tokens = safe_capacity;
     }
+    
+    // Throughput tracking variables
+    long generation_start_ms = 0;
+    long generation_end_ms = 0;
+    int generated_tokens = 0;  // Count only newly generated tokens (excluding prompt)
+    long total_inference_time_ms = 0;
+    long first_token_time_ms = 0;
+    
     {
         DeviceBOs bos = prepare_device_bos(fpga.device, fpga.kernel, weights);
 
         // First call
         int token = prompt_tokens[0];
         int pos = 0;
+        long first_inf_start = time_in_ms();
+        generation_start_ms = first_inf_start;
+        
         auto run = fpga.kernel(
             bos.emb_bo,
             bos.wq_bo, bos.wq_s_bo,
@@ -866,6 +876,11 @@ void generate(Weights *weights, Tokenizer *tokenizer, Sampler *sampler, char *pr
             pos
         );
         run.wait();
+        
+        long first_inf_end = time_in_ms();
+        long first_inf_time = first_inf_end - first_inf_start;
+        first_token_time_ms = first_inf_time;
+        total_inference_time_ms += first_inf_time;
 
         std::vector<float> logits(vocab_size);
         bos.out_bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
@@ -876,6 +891,7 @@ void generate(Weights *weights, Tokenizer *tokenizer, Sampler *sampler, char *pr
             next = prompt_tokens[pos + 1];
         } else {
             next = sample(sampler, logits.data());
+            generated_tokens++;  // First generated token
         }
         
         pos++;
@@ -886,6 +902,8 @@ void generate(Weights *weights, Tokenizer *tokenizer, Sampler *sampler, char *pr
 
         // Generation loop
         while (pos < steps) {
+            long inf_start = time_in_ms();
+            
             auto run2 = fpga.kernel(
                 bos.emb_bo,
                 bos.wq_bo, bos.wq_s_bo,
@@ -907,6 +925,10 @@ void generate(Weights *weights, Tokenizer *tokenizer, Sampler *sampler, char *pr
             );
             run2.wait();
             
+            long inf_end = time_in_ms();
+            long inf_time = inf_end - inf_start;
+            total_inference_time_ms += inf_time;
+            
             bos.out_bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
             bos.out_bo.read(logits.data(), vocab_size * sizeof(float), 0);
 
@@ -914,6 +936,7 @@ void generate(Weights *weights, Tokenizer *tokenizer, Sampler *sampler, char *pr
                 next = prompt_tokens[pos + 1];
             } else {
                 next = sample(sampler, logits.data());
+                generated_tokens++;  // Count generated tokens
             }
             
             pos++;
@@ -924,8 +947,34 @@ void generate(Weights *weights, Tokenizer *tokenizer, Sampler *sampler, char *pr
             fflush(stdout);
             token = next;
         }
+        
+        generation_end_ms = time_in_ms();
         printf("\n");
     }
+
+    // Calculate and print throughput metrics
+    long total_generation_time_ms = generation_end_ms - generation_start_ms;
+    float throughput_tokens_per_sec = 0.0f;
+    if (total_inference_time_ms > 0 && generated_tokens > 0) {
+        // Throughput = tokens / (inference_time_ms / 1000) = tokens * 1000 / inference_time_ms
+        throughput_tokens_per_sec = (generated_tokens / (float)total_inference_time_ms) * 1000.0f;
+    }
+    
+    printf("\n=== Generation Metrics ===\n");
+    printf("Prompt tokens: %d\n", num_prompt_tokens);
+    printf("Generated tokens: %d\n", generated_tokens);
+    printf("Total tokens: %d\n", num_prompt_tokens + generated_tokens);
+    printf("Total generation time: %ld ms (%.2f seconds)\n", 
+           total_generation_time_ms, total_generation_time_ms / 1000.0f);
+    printf("Total inference time: %ld ms (%.2f seconds)\n", 
+           total_inference_time_ms, total_inference_time_ms / 1000.0f);
+    printf("First token latency: %ld ms\n", first_token_time_ms);
+    if (generated_tokens > 0) {
+        printf("Avg time per generated token: %.2f ms\n", 
+               (float)total_inference_time_ms / generated_tokens);
+    }
+    printf("Throughput: %.2f tokens/second\n", throughput_tokens_per_sec);
+    printf("========================\n");
 
     free(prompt_tokens);
 }

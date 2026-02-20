@@ -14,6 +14,6 @@ g++ -std=c++17 -O3 -Wall \
     -I"$KERNEL_INC" \
     "$SRC" \
     -o "$OUT" \
-    -L${XILINX_XRT}/lib -lxrt_coreutil -pthread -lrt -lstdc++
+    -L${XILINX_XRT}/lib -lxrt_coreutil -pthread -lrt -luuid -lstdc++
 
 echo "Host built: $OUT"

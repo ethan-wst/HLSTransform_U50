@@ -54,95 +54,95 @@ extern "C" void forward(
 
     // Embedding
     #pragma HLS INTERFACE m_axi port=token_embedding_table offset=slave depth=24576000 \
-    bundle=gmem0 max_read_burst_length=256 num_read_outstanding=8 \
+    bundle=gmem0 max_read_burst_length=256 num_read_outstanding=32 \
     max_widen_bitwidth=512
 
-    // Attention
+    // Attention weights - int8 (consolidated bundle due to no concurrent access)
     #pragma HLS INTERFACE m_axi port=wq_weights offset=slave depth=7077888 \
-    bundle=gmem1 max_read_burst_length=256 num_read_outstanding=32 \
+    bundle=gmem_att_w max_read_burst_length=256 num_read_outstanding=16 \
     max_widen_bitwidth=512
-    #pragma HLS INTERFACE m_axi port=wq_scales offset=slave depth=110592 \
-    bundle=gmem2 max_read_burst_length=256 num_read_outstanding=16 \
+    #pragma HLS INTERFACE m_axi port=wk_weights offset=slave depth=7077888 \
+    bundle=gmem_att_w max_read_burst_length=256 num_read_outstanding=16 \
+    max_widen_bitwidth=512
+    #pragma HLS INTERFACE m_axi port=wv_weights offset=slave depth=7077888 \
+    bundle=gmem_att_w max_read_burst_length=256 num_read_outstanding=16 \
+    max_widen_bitwidth=512
+    #pragma HLS INTERFACE m_axi port=wo_weights offset=slave depth=7077888 \
+    bundle=gmem_att_w max_read_burst_length=256 num_read_outstanding=16 \
     max_widen_bitwidth=512
 
-    #pragma HLS INTERFACE m_axi port=wk_weights offset=slave depth=7077888 \
-    bundle=gmem3 max_read_burst_length=256 num_read_outstanding=32 \
+    // Attention scales - float (consolidated bundle due to no concurrent access)
+    #pragma HLS INTERFACE m_axi port=wq_scales offset=slave depth=110592 \
+    bundle=gmem_att_s max_read_burst_length=256 num_read_outstanding=8 \
     max_widen_bitwidth=512
     #pragma HLS INTERFACE m_axi port=wk_scales offset=slave depth=110592 \
-    bundle=gmem4 max_read_burst_length=256 num_read_outstanding=16 \
-    max_widen_bitwidth=512
-
-    #pragma HLS INTERFACE m_axi port=wv_weights offset=slave depth=7077888 \
-    bundle=gmem5 max_read_burst_length=256 num_read_outstanding=32 \
+    bundle=gmem_att_s max_read_burst_length=256 num_read_outstanding=8 \
     max_widen_bitwidth=512
     #pragma HLS INTERFACE m_axi port=wv_scales offset=slave depth=110592 \
-    bundle=gmem6 max_read_burst_length=256 num_read_outstanding=16 \
-    max_widen_bitwidth=512
-
-    #pragma HLS INTERFACE m_axi port=wo_weights offset=slave depth=7077888 \
-    bundle=gmem7 max_read_burst_length=256 num_read_outstanding=32 \
+    bundle=gmem_att_s max_read_burst_length=256 num_read_outstanding=8 \
     max_widen_bitwidth=512
     #pragma HLS INTERFACE m_axi port=wo_scales offset=slave depth=110592 \
-    bundle=gmem8 max_read_burst_length=256 num_read_outstanding=16 \
+    bundle=gmem_att_s max_read_burst_length=256 num_read_outstanding=8 \
     max_widen_bitwidth=512
 
-    // FFN
+    // FFN weights - int8 (consolidated bundle due to no concurrent access)
     #pragma HLS INTERFACE m_axi port=w1_weights offset=slave depth=18874368 \
-    bundle=gmem9 max_read_burst_length=256 num_read_outstanding=32 \
+    bundle=gmem_ffn_w max_read_burst_length=256 num_read_outstanding=16 \
     max_widen_bitwidth=512
-    #pragma HLS INTERFACE m_axi port=w1_scales offset=slave depth=294912 \
-    bundle=gmem10 max_read_burst_length=256 num_read_outstanding=16 \
+    #pragma HLS INTERFACE m_axi port=w2_weights offset=slave depth=18874368 \
+    bundle=gmem_ffn_w max_read_burst_length=256 num_read_outstanding=16 \
+    max_widen_bitwidth=512
+    #pragma HLS INTERFACE m_axi port=w3_weights offset=slave depth=18874368 \
+    bundle=gmem_ffn_w max_read_burst_length=256 num_read_outstanding=16 \
     max_widen_bitwidth=512
 
-    #pragma HLS INTERFACE m_axi port=w2_weights offset=slave depth=18874368 \
-    bundle=gmem11 max_read_burst_length=256 num_read_outstanding=32 \
+    // FFN scales - float (consolidated bundle due to no concurrent access)
+    #pragma HLS INTERFACE m_axi port=w1_scales offset=slave depth=294912 \
+    bundle=gmem_ffn_s max_read_burst_length=256 num_read_outstanding=8 \
     max_widen_bitwidth=512
     #pragma HLS INTERFACE m_axi port=w2_scales offset=slave depth=294912 \
-    bundle=gmem12 max_read_burst_length=256 num_read_outstanding=16 \
-    max_widen_bitwidth=512
-
-    #pragma HLS INTERFACE m_axi port=w3_weights offset=slave depth=18874368 \
-    bundle=gmem13 max_read_burst_length=256 num_read_outstanding=32 \
+    bundle=gmem_ffn_s max_read_burst_length=256 num_read_outstanding=8 \
     max_widen_bitwidth=512
     #pragma HLS INTERFACE m_axi port=w3_scales offset=slave depth=294912 \
-    bundle=gmem14 max_read_burst_length=256 num_read_outstanding=16 \
+    bundle=gmem_ffn_s max_read_burst_length=256 num_read_outstanding=8 \
     max_widen_bitwidth=512
 
-    // RMS Norm
+    // RMS Norm weights (consolidated bundle due to no concurrent access)
     #pragma HLS INTERFACE m_axi port=rms_att_weight offset=slave depth=9216 \
-    bundle=gmem15 max_read_burst_length=64 num_read_outstanding=4 \
+    bundle=gmem_rms max_read_burst_length=64 num_read_outstanding=4 \
     max_widen_bitwidth=512
     #pragma HLS INTERFACE m_axi port=rms_ffn_weight offset=slave depth=9216 \
-    bundle=gmem16 max_read_burst_length=64 num_read_outstanding=4 \
-    max_widen_bitwidth=512
-    #pragma HLS INTERFACE m_axi port=rms_final_weight offset=slave depth=768 \
-    bundle=gmem17 max_read_burst_length=64 num_read_outstanding=4 \
+    bundle=gmem_rms max_read_burst_length=64 num_read_outstanding=4 \
     max_widen_bitwidth=512
 
-    // Classifier
+    // RMS Final weigths (only used post-loop)
+    #pragma HLS INTERFACE m_axi port=rms_final_weight offset=slave depth=768 \
+    bundle=gmem_rms_final max_read_burst_length=64 num_read_outstanding=4 \
+    max_widen_bitwidth=512
+
+    // Classifier weights (only used post-loop)
     #pragma HLS INTERFACE m_axi port=wcls_weights offset=slave depth=24576000 \
-    bundle=gmem18 max_read_burst_length=256 num_read_outstanding=32 \
+    bundle=gmem_cls max_read_burst_length=256 num_read_outstanding=32 \
     max_widen_bitwidth=512
     #pragma HLS INTERFACE m_axi port=wcls_scales offset=slave depth=384000 \
-    bundle=gmem19 max_read_burst_length=256 num_read_outstanding=16 \
+    bundle=gmem_cls_s max_read_burst_length=256 num_read_outstanding=16 \
     max_widen_bitwidth=512
 
-    // KV Cache
+    // KV Cache (mixed read/write access)
     #pragma HLS INTERFACE m_axi port=key_cache offset=slave depth=9437184 \
-    bundle=gmem20 \
-    max_read_burst_length=64 max_write_burst_length=256 \
-    num_read_outstanding=64 num_write_outstanding=8 \
+    bundle=gmem_kv_k \
+    max_read_burst_length=64 max_write_burst_length=64 \
+    num_read_outstanding=16 num_write_outstanding=4 \
     max_widen_bitwidth=512
-
     #pragma HLS INTERFACE m_axi port=value_cache offset=slave depth=9437184 \
-    bundle=gmem21 \
-    max_read_burst_length=64 max_write_burst_length=256 \
-    num_read_outstanding=64 num_write_outstanding=8 \
+    bundle=gmem_kv_v \
+    max_read_burst_length=64 max_write_burst_length=64 \
+    num_read_outstanding=16 num_write_outstanding=4 \
     max_widen_bitwidth=512
 
     // Output
     #pragma HLS INTERFACE m_axi port=out offset=slave depth=32000 \
-    bundle=gmem22 max_write_burst_length=256 num_write_outstanding=8 \
+    bundle=gmem_out max_write_burst_length=256 num_write_outstanding=8 \
     max_widen_bitwidth=512
 
     // Control
@@ -151,42 +151,55 @@ extern "C" void forward(
     #pragma HLS INTERFACE s_axilite port=return
 
 
-    // ====================== LOCAL ARRAYS ========================             // dimension of each attention head
+    // ====================== LOCAL ARRAYS ========================
 
-    // Main activation buffers
-    float x[dim];                    // Current activation
-    float xb[dim];                   // Intermediate buffer 1
-    float xb2[dim];                  // Intermediate buffer 2
-    float hb[hidden_dim];            // Hidden layer buffer
-    float hb2[hidden_dim];           // Hidden layer buffer 2
-    float q[dim];                    // Query
-    float k[kv_dim];                 // Key
-    float v[kv_dim];                 // Value
-    float att[n_heads * seq_len];    // Attention scores     
-    
-    // Quantized tensors
+    // URAM Buffers
+    float x[dim];
+    #pragma HLS BIND_STORAGE variable=x type=ram_t2p impl=uram
+    #pragma HLS ARRAY_PARTITION variable=x cyclic factor=8
+
+    float xb[dim];
+    #pragma HLS BIND_STORAGE variable=xb type=ram_t2p impl=uram
+    #pragma HLS ARRAY_PARTITION variable=xb cyclic factor=16
+
+    float xb2[dim];
+    #pragma HLS BIND_STORAGE variable=xb2 type=ram_t2p impl=uram
+    #pragma HLS ARRAY_PARTITION variable=xb2 cyclic factor=4
+
+    float hb[hidden_dim];
+    #pragma HLS BIND_STORAGE variable=hb type=ram_t2p impl=uram
+    #pragma HLS ARRAY_PARTITION variable=hb cyclic factor=8
+
+    float hb2[hidden_dim];
+    #pragma HLS BIND_STORAGE variable=hb2 type=ram_t2p impl=uram
+    #pragma HLS ARRAY_PARTITION variable=hb2 cyclic factor=4
+
+    float q[dim];
+    #pragma HLS BIND_STORAGE variable=q type=ram_t2p impl=uram
+    #pragma HLS ARRAY_PARTITION variable=q cyclic factor=16
+
+    float att[n_heads * seq_len];
+    #pragma HLS BIND_STORAGE variable=att type=ram_t2p impl=uram
+    #pragma HLS ARRAY_PARTITION variable=att cyclic factor=12
+
+    // BRAM buffers (Frequent Access / Small)
+    float k[kv_dim];
+    #pragma HLS ARRAY_PARTITION variable=k cyclic factor=4
+
+    float v[kv_dim];
+    #pragma HLS ARRAY_PARTITION variable=v cyclic factor=4
+
     int8_t xq[dim];
+    #pragma HLS ARRAY_PARTITION variable=xq cyclic factor=16    // Aligned with PACK_SIZE
+
     float xq_s[dim/GS];
+    #pragma HLS ARRAY_PARTITION variable=xq_s cyclic factor=4
 
     int8_t hq[hidden_dim];
+    #pragma HLS ARRAY_PARTITION variable=hq cyclic factor=16    // Aligned with PACK_SIZE
+
     float hq_s[hidden_dim/GS];
-    
-    #pragma HLS ARRAY_PARTITION variable=x type=cyclic factor=4
-    #pragma HLS ARRAY_PARTITION variable=xb type=cyclic factor=4
-    #pragma HLS ARRAY_PARTITION variable=xb2 type=cyclic factor=4
-    #pragma HLS ARRAY_PARTITION variable=hb type=cyclic factor=4
-    #pragma HLS ARRAY_PARTITION variable=hb2 type=cyclic factor=4
-
-    #pragma HLS ARRAY_PARTITION variable=q type=cyclic factor=4
-    #pragma HLS ARRAY_PARTITION variable=k type=cyclic factor=4
-    #pragma HLS ARRAY_PARTITION variable=v type=cyclic factor=4
-    #pragma HLS ARRAY_PARTITION variable=att type=cyclic factor=4
-
-    #pragma HLS ARRAY_PARTITION variable=xq type=cyclic factor=4
-    #pragma HLS ARRAY_PARTITION variable=xq_s type=cyclic factor=4
-
-    #pragma HLS ARRAY_PARTITION variable=hq type=cyclic factor=4
-    #pragma HLS ARRAY_PARTITION variable=hq_s type=cyclic factor=4
+    #pragma HLS ARRAY_PARTITION variable=hq_s cyclic factor=4
 
     // ================= FORWARD PASS PREPERATION =================
 
@@ -197,7 +210,7 @@ extern "C" void forward(
 
 
     // Pre-compute reciprocals for frequent divisions
-    static const float inv_head_size = 1.0f / float(head_size);
+    constexpr float inv_head_size = 1.0f / float(head_size);
     static const float inv_sqrt_head_size = 1.0f / hls::sqrtf(float(head_size));
     constexpr float inv_10000 = 1.0f / 10000.0f;
 
@@ -294,21 +307,21 @@ extern "C" void forward(
 
             float *q_head = q + h * head_size;
             float *att_head = att + h * seq_len;
-            
+            int kv_head = h / kv_mul;
+
             // Compute attention scores for this head
             att_scores:
             for (int t = 0; t <= pos; t++) {
-                #pragma HLS LOOP_TRIPCOUNT min=1 max=1024
                 #pragma HLS PIPELINE II=1
+                #pragma HLS LOOP_TRIPCOUNT min=1 max=1024
 
-                int kv_head = h / (n_heads / n_kv_heads);
                 float *k_head = &key_cache[kv_cache_offset + t * kv_dim + kv_head * head_size];
                 
                 float score = 0.0f;
+
                 attention_dot:
                 for (int i = 0; i < head_size; i++) {
-                    #pragma HLS LOOP_TRIPCOUNT min=64 max=64
-
+                    #pragma HLS UNROLL factor=16
 
                     score += q_head[i] * k_head[i];
                 }
@@ -332,14 +345,13 @@ extern "C" void forward(
             att_weighted_sum:
             for (int t = 0; t <= pos; t++) {
                 #pragma HLS PIPELINE II=1
+                #pragma HLS LOOP_TRIPCOUNT min=1 max=1024
 
-                int kv_head = h / (n_heads / n_kv_heads);
                 float *v_head = &value_cache[kv_cache_offset + t * kv_dim + kv_head * head_size];
                 float a = att_head[t];
                 
                 for (int i = 0; i < head_size; i++) {
-                    #pragma HLS UNROLL factor=8
-                    #pragma HLS LOOP_TRIPCOUNT min=64 max=64
+                    #pragma HLS UNROLL factor=16
 
                     xb_head[i] += a * v_head[i];
                 }
@@ -371,7 +383,6 @@ extern "C" void forward(
         swi_glu:
         for (int i = 0; i < hidden_dim; i++) {
             #pragma HLS PIPELINE II=1
-            #pragma HLS UNROLL factor=4
             #pragma HLS LOOP_TRIPCOUNT min=2048 max=2048
 
             float val = hb[i];
@@ -387,7 +398,6 @@ extern "C" void forward(
         residual_ffn:
         for (int i = 0; i < dim; i++) {
             #pragma HLS PIPELINE II=1
-            #pragma HLS UNROLL factor=16
             #pragma HLS LOOP_TRIPCOUNT min=768 max=768
 
             x[i] += xb[i];

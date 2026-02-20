@@ -64,6 +64,7 @@ template<int D, int N>
 void matmul(float *xout, int8_t *xq, float *xs, int8_t *wq, float *ws) {
 
     wide_int8_t *wq_wide = (wide_int8_t *)wq;
+    const int NUM_GROUPS = N / GS;
 
     output_loop: 
     for (int i = 0; i < D; i++) {
@@ -74,14 +75,12 @@ void matmul(float *xout, int8_t *xq, float *xs, int8_t *wq, float *ws) {
         
         inner_loop: 
         for (int j = 0; j < N; j+=GS) {
-        #pragma HLS LOOP_TRIPCOUNT min=768 max=2048
         #pragma HLS PIPELINE II=1
 
             float partial_sum = 0.0f;
 
             chunk_loop:
             for (int chunk = 0; chunk < GS; chunk += PACK_SIZE) {
-                #pragma HLS LOOP_TRIPCOUNT min=PACK_SIZE/GS max=PACK_SIZE/GS
                 #pragma HLS UNROLL
 
                 int global_j = j + chunk;
@@ -89,31 +88,27 @@ void matmul(float *xout, int8_t *xq, float *xs, int8_t *wq, float *ws) {
                 wide_int8_t w_chunk = wq_wide[wide_idx];
             
                 int32_t dot_acc = 0;
+                #pragma HLS BIND_OP variable=dot_acc op=add impl=DSP
 
                 dot_loop: 
                 for (int k = 0; k < PACK_SIZE; k++) {
                     #pragma HLS UNROLL
 
-                    int32_t prod = ((int32_t)xq[global_j + k]) * ((int32_t)((int8_t)w_chunk.range(8*k + 7, 8*k)));
-                    dot_acc += prod;
+                    int32_t w_val = ((int32_t)((int8_t)w_chunk.range(8*k + 7, 8*k)));
+                    int32_t x_val = ((int32_t)xq[global_j + k]);
+                    dot_acc += x_val * w_val;
                 }
                 
-                float dequant = ((float)dot_acc) * ws[i * N /GS + global_j / GS] * xs[global_j / GS];
-                partial_sum += dequant;
+                partial_sum += ((float)dot_acc) * ws[i * N /GS + global_j / GS] * xs[global_j / GS];
             }
             acc[(j / GS) % 8] += partial_sum;
         }
-
-        float output_acc;
+        
         float sum0 = acc[0] + acc[1];
         float sum1 = acc[2] + acc[3];
         float sum2 = acc[4] + acc[5];
         float sum3 = acc[6] + acc[7];
-        float sum_lo = sum0 + sum1;
-        float sum_hi = sum2 + sum3;
-        output_acc = sum_lo + sum_hi;
-
-        xout[i] = output_acc;
+        xout[i] = (sum0 + sum1) + (sum2 + sum3);
     }
 }
 
@@ -130,9 +125,7 @@ void softmax(float *x, int size) {
         #pragma HLS PIPELINE II=1
         #pragma HLS LOOP_TRIPCOUNT min=1 max=MAXSIZE
 
-        if (x[i] > max_val) {
-            max_val = x[i];
-        } 
+        max_val = (x[i] > max_val) ? x[i] : max_val;
     }
     
     // Exp and sum
@@ -207,15 +200,9 @@ void quantize(int8_t qx_q[S], float qx_s[S/GS], float x[S]) {
         find_max:
         for (int i = 0; i < GS; i++) {
             #pragma HLS PIPELINE II=1
-            #pragma HLS LOOP_TRIPCOUNT min=GS max=GS
 
-
-            float val = x[base_idx + i];
-            float abs_val = (val < 0.0f) ? -val : val;
-
-            if (abs_val > wmax) {
-                wmax = abs_val;
-            } 
+            float abs_val = hls::fabsf(x[base_idx + i]);
+            wmax = (abs_val > wmax) ? abs_val : wmax;
         }
         
         // Calculate scale and quantize

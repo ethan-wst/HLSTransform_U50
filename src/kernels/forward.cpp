@@ -156,7 +156,7 @@ extern "C" void forward(
     // URAM Buffers
     float x[dim];
     #pragma HLS BIND_STORAGE variable=x type=ram_t2p impl=uram
-    #pragma HLS ARRAY_PARTITION variable=x cyclic factor=8
+    #pragma HLS ARRAY_PARTITION variable=x cyclic factor=16
 
     float xb[dim];
     #pragma HLS BIND_STORAGE variable=xb type=ram_t2p impl=uram
@@ -164,7 +164,7 @@ extern "C" void forward(
 
     float xb2[dim];
     #pragma HLS BIND_STORAGE variable=xb2 type=ram_t2p impl=uram
-    #pragma HLS ARRAY_PARTITION variable=xb2 cyclic factor=4
+    #pragma HLS ARRAY_PARTITION variable=xb2 cyclic factor=16
 
     float hb[hidden_dim];
     #pragma HLS BIND_STORAGE variable=hb type=ram_t2p impl=uram
@@ -299,7 +299,6 @@ extern "C" void forward(
             #pragma HLS PIPELINE II=1
             value_cache[kv_cache_pos_offset + i] = v[i];
         }
-        
 
         multihead_attention:
         for (int h = 0; h < n_heads; h++) {
@@ -309,7 +308,6 @@ extern "C" void forward(
             float *att_head = att + h * seq_len;
             int kv_head = h / kv_mul;
 
-            // Compute attention scores for this head
             att_scores:
             for (int t = 0; t <= pos; t++) {
                 #pragma HLS PIPELINE II=1
@@ -367,7 +365,7 @@ extern "C" void forward(
             #pragma HLS UNROLL factor=16
             #pragma HLS LOOP_TRIPCOUNT min=768 max=768
 
-            x[i] += xb2[i];
+            x[i] = xb2[i] + x[i];
         }
 
         // ===================== FFN BLOCK =====================
@@ -400,7 +398,7 @@ extern "C" void forward(
             #pragma HLS PIPELINE II=1
             #pragma HLS LOOP_TRIPCOUNT min=768 max=768
 
-            x[i] += xb[i];
+            x[i] = xb[i] + x[i];
         }
     }
 

@@ -18,10 +18,8 @@
 
 // Wide integer type for data packing, optimizing burst memory access
 // PACK_SIZE must equal casted wide_int8_t size / 8 (ei. number of 8-bit chunks in the wide_int8_t)
-typedef ap_uint<128> wide_int8_t;
-#define PACK_SIZE 16
-
-#define UNROLL_FACTOR 8
+typedef ap_uint<512> wide_int8_t;
+#define PACK_SIZE 64
 
 extern "C" void forward(
     // Embedding Weights
@@ -72,6 +70,10 @@ void matmul(float *xout, int8_t *xq, float *xs, int8_t *wq, float *ws) {
         
         float acc[8] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
         #pragma HLS ARRAY_PARTITION variable=acc complete
+
+        // Calculate group and base wide index once
+        int group_offset = i * NUM_GROUPS;
+        int base_wide = i * N  / PACK_SIZE;
         
         inner_loop: 
         for (int j = 0; j < N; j+=GS) {
@@ -84,11 +86,9 @@ void matmul(float *xout, int8_t *xq, float *xs, int8_t *wq, float *ws) {
                 #pragma HLS UNROLL
 
                 int global_j = j + chunk;
-                int wide_idx = (i * N + global_j) / PACK_SIZE;
-                wide_int8_t w_chunk = wq_wide[wide_idx];
+                wide_int8_t w_chunk = wq_wide[base_wide + global_j / PACK_SIZE];
             
                 int32_t dot_acc = 0;
-                #pragma HLS BIND_OP variable=dot_acc op=add impl=DSP
 
                 dot_loop: 
                 for (int k = 0; k < PACK_SIZE; k++) {
@@ -96,12 +96,13 @@ void matmul(float *xout, int8_t *xq, float *xs, int8_t *wq, float *ws) {
 
                     int32_t w_val = ((int32_t)((int8_t)w_chunk.range(8*k + 7, 8*k)));
                     int32_t x_val = ((int32_t)xq[global_j + k]);
-                    dot_acc += x_val * w_val;
+
+                    dot_acc = w_val * x_val + dot_acc;
                 }
                 
                 partial_sum += ((float)dot_acc) * ws[i * N /GS + global_j / GS] * xs[global_j / GS];
             }
-            acc[(j / GS) % 8] += partial_sum;
+            acc[(j / GS) % 8] = acc[(j / GS) % 8] + partial_sum;
         }
         
         float sum0 = acc[0] + acc[1];
@@ -137,7 +138,7 @@ void softmax(float *x, int size) {
 
         float exp_val = hls::expf(x[i] - max_val);
         x[i] = exp_val;
-        sum += exp_val;
+        sum = exp_val + sum;
     }
 
     float inv_sum = 1.0f / sum;
@@ -164,11 +165,11 @@ void rmsnorm(float o[S], float x[S], float weight[S]) {
         #pragma HLS LOOP_TRIPCOUNT min=S max=S
 
         float val = x[j];
-        ss += val * val; // Read once, use twice
+        ss = val * val + ss; // Read once, use twice
     }
 
     ss /= S;
-    ss += 1e-5f;
+    ss = 1e-5f + ss;
     ss = 1.0f / hls::sqrt(ss);
     
     // Normalize and scale

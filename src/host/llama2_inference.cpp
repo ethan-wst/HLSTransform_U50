@@ -66,9 +66,6 @@ struct Weights {
     // Classifier weights (quantized)
     int8_t *wcls_weights;
     float *wcls_scales;
-    
-    // Track if classifier is shared to avoid double-free
-    bool cls_is_shared;
 };
 
 // Structure to hold the tokenizer data
@@ -511,22 +508,14 @@ void read_checkpoint(std::string checkpoint, Weights *weights) {
     if (!shared_classifier) {
         posix_memalign((void**)&weights->wcls_weights, 4096, cls_size * sizeof(int8_t));
         posix_memalign((void**)&weights->wcls_scales, 4096, cls_scale_size * sizeof(float));
-        
         fread(weights->wcls_weights, sizeof(int8_t), cls_size, file);
         fread(weights->wcls_scales, sizeof(float), cls_scale_size, file);
-        
-        weights->cls_is_shared = false;
-        
-        // Free temporary embedding quantized data
         free(q_emb);
         free(s_emb);
     } else {
-        // Reuse token embedding weights (keep quantized version)
         weights->wcls_weights = q_emb;
         weights->wcls_scales = s_emb;
-        weights->cls_is_shared = true;
     }
-    
     fclose(file);
 }
 
@@ -1140,20 +1129,19 @@ void evaluate(const std::string& text_file, Weights *weights, Tokenizer *tokeniz
                     if (local_pos == 0) story_first_token_ms = inf_time;
                     story_total_infer_ms += inf_time;
 
-                    // Synchronize ALL modified buffers from device
-                    // Key/value cache is modified by kernel and must be synced for next iteration
-                    bos.key_bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
-                    bos.value_bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+                    // // Synchronize ALL modified buffers from device
+                    // // Key/value cache is modified by kernel and must be synced for next iteration
+                    // bos.key_bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+                    // bos.value_bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
                     
-                    // Force cache coherency by syncing back to device
-                    // This ensures writes from previous kernel are visible to next kernel
-                    bos.key_bo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
-                    bos.value_bo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+                    // // Force cache coherency by syncing back to device
+                    // // This ensures writes from previous kernel are visible to next kernel
+                    // bos.key_bo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+                    // bos.value_bo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
                     
                     bos.out_bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
                     
                     // Zero buffer before read to ensure no stale data
-                    std::fill(logits.begin(), logits.end(), 0.0f);
                     bos.out_bo.read(logits.data(), vocab_size * sizeof(float), 0);
 
                     float lp = compute_log_prob(logits.data(), target_token, vocab_size);
